@@ -1,0 +1,112 @@
+name: Seed Claude Inline Comment Buffer
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_pr:
+        description: "Open PR number in repo-a used only to scope the buffered entry"
+        required: true
+      body_marker:
+        description: "Optional unique marker override; leave empty to auto-generate"
+        required: false
+      comment_path:
+        description: "Buffered path that run B's PR must modify"
+        required: false
+        default: "README.md"
+      comment_line:
+        description: "Buffered line number that run B's PR must make commentable"
+        required: false
+        default: "1"
+
+jobs:
+  seed-buffer:
+    # Replace self-hosted with a label that resolves to the same
+    # non-ephemeral self-hosted runner host used by repo-b.
+    runs-on: [self-hosted, self-hosted]
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Compute unique body marker for run A
+        id: marker
+        shell: bash
+        env:
+          BODY_MARKER_INPUT: ${{ inputs.body_marker }}
+        run: |
+          if [ -n "$BODY_MARKER_INPUT" ]; then
+            marker="$BODY_MARKER_INPUT"
+          else
+            marker="LIVE-REPLAY-SEED-${GITHUB_RUN_ID}-${GITHUB_REPOSITORY}"
+          fi
+          echo "RUN_A_UNIQUE_BODY=$marker"
+          echo "marker=$marker" >> "$GITHUB_OUTPUT"
+
+      - name: Show runner identity
+        shell: bash
+        run: |
+          sha256_file() {
+            if [ -f "$1" ]; then
+              if command -v sha256sum >/dev/null 2>&1; then
+                sha256sum "$1" | awk '{print $1}'
+              else
+                shasum -a 256 "$1" | awk '{print $1}'
+              fi
+            else
+              echo ABSENT
+            fi
+          }
+          echo "RUNNER_NAME=${{ runner.name }}"
+          echo "HOSTNAME=$(hostname)"
+          echo "RUNNER_TEMP=${RUNNER_TEMP:-UNSET}"
+          echo "BUFFERED_COMMENT_PATH=${{ inputs.comment_path || 'README.md' }}"
+          echo "BUFFERED_COMMENT_LINE=${{ inputs.comment_line || '1' }}"
+          echo "BUFFER_BEFORE=$(test -f /tmp/inline-comments-buffer.jsonl && wc -l < /tmp/inline-comments-buffer.jsonl || echo 0)"
+          echo "BUFFER_SHA256_BEFORE_SEED=$(sha256_file /tmp/inline-comments-buffer.jsonl)"
+
+      - name: Checkout owned repo with helper scripts
+        uses: actions/checkout@v4
+
+      - name: Checkout claude-code-action source
+        uses: actions/checkout@v4
+        with:
+          repository: anthropics/claude-code-action
+          ref: 73c91f04a832f76c606b0c6a3adaa393714cbd81
+          path: claude-code-action
+
+      - name: Buffer comment through the real MCP server
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node poc/inline-buffer-seed-via-mcp.mjs \
+            --repo-root "$GITHUB_WORKSPACE/claude-code-action" \
+            --owner "${{ github.repository_owner }}" \
+            --repo "${{ github.event.repository.name }}" \
+            --pr "${{ inputs.target_pr }}" \
+            --token "$GITHUB_TOKEN" \
+            --path "${{ inputs.comment_path || 'README.md' }}" \
+            --line "${{ inputs.comment_line || '1' }}" \
+            --body "${{ steps.marker.outputs.marker }}"
+
+      - name: Show buffer after run A
+        shell: bash
+        run: |
+          sha256_file() {
+            if [ -f "$1" ]; then
+              if command -v sha256sum >/dev/null 2>&1; then
+                sha256sum "$1" | awk '{print $1}'
+              else
+                shasum -a 256 "$1" | awk '{print $1}'
+              fi
+            else
+              echo ABSENT
+            fi
+          }
+          echo "RUNNER_NAME=${{ runner.name }}"
+          echo "HOSTNAME=$(hostname)"
+          echo "RUN_A_UNIQUE_BODY=${{ steps.marker.outputs.marker }}"
+          echo "RUNNER_TEMP=${RUNNER_TEMP:-UNSET}"
+          echo "BUFFERED_COMMENT_PATH=${{ inputs.comment_path || 'README.md' }}"
+          echo "BUFFERED_COMMENT_LINE=${{ inputs.comment_line || '1' }}"
+          echo "BUFFER_AFTER=$(test -f /tmp/inline-comments-buffer.jsonl && wc -l < /tmp/inline-comments-buffer.jsonl || echo 0)"
+          echo "BUFFER_SHA256_AFTER_SEED=$(sha256_file /tmp/inline-comments-buffer.jsonl)"
+          ls -l /tmp/inline-comments-buffer.jsonl || true
