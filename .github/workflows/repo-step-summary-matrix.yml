@@ -1,0 +1,58 @@
+name: Step Summary Matrix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - job_name: report-off-show-off
+            display_report: "false"
+            show_full_output: "false"
+          - job_name: report-on-show-off
+            display_report: "true"
+            show_full_output: "false"
+          - job_name: report-on-show-on
+            display_report: "true"
+            show_full_output: "true"
+
+    name: ${{ matrix.job_name }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out owned repo
+        uses: actions/checkout@v5
+
+      - name: Run step-summary matrix helper
+        shell: bash
+        env:
+          DISPLAY_REPORT: ${{ matrix.display_report }}
+          SHOW_FULL_OUTPUT: ${{ matrix.show_full_output }}
+        run: |
+          node poc/step-summary-matrix-helper.mjs \
+            --display-report "$DISPLAY_REPORT" \
+            --show-full-output "$SHOW_FULL_OUTPUT" \
+            --runner-temp "${RUNNER_TEMP}" \
+            --summary-file "${GITHUB_STEP_SUMMARY}" \
+            --stdout-capture-file "${RUNNER_TEMP}/claude-sanitized-stdout.txt" \
+            --secret-marker "STEP-SUMMARY-MATRIX-${{ github.run_id }}-${{ matrix.job_name }}"
+
+      - name: Snapshot step summary file
+        shell: bash
+        run: |
+          cp "${GITHUB_STEP_SUMMARY}" "${RUNNER_TEMP}/github-step-summary.md"
+
+      - name: Persist artifacts for offline inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-summary-${{ matrix.job_name }}
+          path: |
+            ${{ runner.temp }}/claude-execution-output.json
+            ${{ runner.temp }}/claude-sanitized-stdout.txt
+            ${{ runner.temp }}/github-step-summary.md
