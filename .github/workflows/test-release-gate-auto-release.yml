@@ -1,0 +1,42 @@
+name: Auto Release on CLI Bump
+
+on:
+  workflow_run:
+    workflows: ["Test"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  check-trigger:
+    runs-on: ubuntu-latest
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      startsWith(github.event.workflow_run.head_commit.message, 'chore: bump bundled CLI version to')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Log trigger fields
+        run: |
+          echo "HEAD_BRANCH=${{ github.event.workflow_run.head_branch }}"
+          echo "HEAD_SHA=${{ github.event.workflow_run.head_sha }}"
+          echo "HEAD_MESSAGE=${{ github.event.workflow_run.head_commit.message }}"
+
+      - name: Verify version file was changed
+        run: |
+          if ! git diff --name-only HEAD~1 | grep -q '_cli_version.py'; then
+            echo "::error::_cli_version.py not changed in this commit"
+            exit 1
+          fi
+
+      - name: Tag write sink
+        run: |
+          TAG="poc-release-${{ github.run_id }}"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git tag -a "$TAG" -m "PoC auto release tag"
+          git push origin "$TAG"
