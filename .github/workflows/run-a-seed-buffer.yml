@@ -73,13 +73,18 @@ jobs:
           ref: 73c91f04a832f76c606b0c6a3adaa393714cbd81
           path: claude-code-action
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Install claude-code-action dependencies
         working-directory: ${{ github.workspace }}/claude-code-action
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
+          if [ -f bun.lockb ] || [ -f bun.lock ]; then
+            bun install --frozen-lockfile || bun install
           else
-            npm install
+            bun install
           fi
 
       - name: Buffer comment through the real MCP server
