@@ -1,0 +1,31 @@
+name: GitHub Mask Summary Artifact Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mask-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Emit masked token to log summary output and artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="FAKE-MASK-TOKEN-${GITHUB_RUN_ID}"
+          echo "::add-mask::$TOKEN"
+
+          echo "LOG_TOKEN=$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo "SUMMARY_TOKEN=$TOKEN" >> "$GITHUB_STEP_SUMMARY"
+
+          mkdir -p out
+          printf 'ARTIFACT_TOKEN=%s\n' "$TOKEN" > out/masked.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: masked-output
+          path: out/masked.txt
