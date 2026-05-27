@@ -40,13 +40,9 @@ jobs:
             --show-full-output "$SHOW_FULL_OUTPUT" \
             --runner-temp "${RUNNER_TEMP}" \
             --summary-file "${GITHUB_STEP_SUMMARY}" \
+            --same-step-summary-capture-file "${RUNNER_TEMP}/github-step-summary-same-step.md" \
             --stdout-capture-file "${RUNNER_TEMP}/claude-sanitized-stdout.txt" \
             --secret-marker "STEP-SUMMARY-MATRIX-${{ github.run_id }}-${{ matrix.job_name }}"
-
-      - name: Snapshot step summary file
-        shell: bash
-        run: |
-          cp "${GITHUB_STEP_SUMMARY}" "${RUNNER_TEMP}/github-step-summary.md"
 
       - name: Persist artifacts for offline inspection
         uses: actions/upload-artifact@v4
@@ -55,4 +51,4 @@ jobs:
           path: |
             ${{ runner.temp }}/claude-execution-output.json
             ${{ runner.temp }}/claude-sanitized-stdout.txt
-            ${{ runner.temp }}/github-step-summary.md
+            ${{ runner.temp }}/github-step-summary-same-step.md
