@@ -73,6 +73,15 @@ jobs:
           ref: 73c91f04a832f76c606b0c6a3adaa393714cbd81
           path: claude-code-action
 
+      - name: Install claude-code-action dependencies
+        working-directory: ${{ github.workspace }}/claude-code-action
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
       - name: Buffer comment through the real MCP server
         env:
           GITHUB_TOKEN: ${{ github.token }}
