@@ -172,6 +172,9 @@ const showFullOutput = args["show-full-output"] === "true";
 const displayReport = args["display-report"] === "true";
 const runnerTemp = args["runner-temp"] || process.env.RUNNER_TEMP || "/tmp";
 const summaryFile = args["summary-file"] || process.env.GITHUB_STEP_SUMMARY;
+const sameStepSummaryCaptureFile =
+  args["same-step-summary-capture-file"] ||
+  join(runnerTemp, "github-step-summary-same-step.md");
 const executionFile =
   args["execution-file"] || join(runnerTemp, "claude-execution-output.json");
 const stdoutCaptureFile =
@@ -183,6 +186,7 @@ mkdirSync(dirname(stdoutCaptureFile), { recursive: true });
 if (summaryFile) {
   mkdirSync(dirname(summaryFile), { recursive: true });
 }
+mkdirSync(dirname(sameStepSummaryCaptureFile), { recursive: true });
 
 const transcript = [
   {
@@ -246,6 +250,7 @@ const rawExecution = readFileSync(executionFile, "utf8");
 const stdoutCapture = readFileSync(stdoutCaptureFile, "utf8");
 const stepSummaryContent =
   displayReport && summaryFile ? readFileSync(summaryFile, "utf8") : "";
+writeFileSync(sameStepSummaryCaptureFile, stepSummaryContent, "utf8");
 
 console.log(`SHOW_FULL_OUTPUT=${String(showFullOutput)}`);
 console.log(`DISPLAY_REPORT=${String(displayReport)}`);
@@ -255,6 +260,7 @@ console.log(`STDOUT_CAPTURE_FILE=${stdoutCaptureFile}`);
 if (summaryFile) {
   console.log(`GITHUB_STEP_SUMMARY_FILE=${summaryFile}`);
 }
+console.log(`SAME_STEP_SUMMARY_CAPTURE_FILE=${sameStepSummaryCaptureFile}`);
 console.log(
   `EXECUTION_FILE_RAW_CONTAINS_SECRET=${String(rawExecution.includes(secretMarker))}`,
 );
