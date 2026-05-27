@@ -1,0 +1,1 @@
+{"name":"git-market-poc","owner":{"name":"Test"},"plugins":[{"name":"safe-plugin","description":"entry","source":"./plugins/safe"}]}
