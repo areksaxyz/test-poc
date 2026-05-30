@@ -1,0 +1,49 @@
+name: Auto Release Livehead
+
+on:
+  workflow_run:
+    workflows: ["Test Livehead"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      startsWith(github.event.workflow_run.head_commit.message, 'chore: bump bundled CLI version to')
+    permissions:
+      contents: write
+    steps:
+      - name: Log trigger fields before delay
+        run: |
+          echo "TRIGGER_HEAD_SHA=${{ github.event.workflow_run.head_sha }}"
+          echo "TRIGGER_HEAD_MESSAGE=${{ github.event.workflow_run.head_commit.message }}"
+          echo "TRIGGER_HEAD_BRANCH=${{ github.event.workflow_run.head_branch }}"
+
+      - name: Sleep to widen live-head race
+        run: sleep 30
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Log current checkout state
+        run: |
+          echo "CHECKOUT_HEAD=$(git rev-parse HEAD)"
+          echo "ROOT_TXT=$(find . -maxdepth 1 -type f -name '*.txt' -printf '%f\n' | sort | tr '\n' ',' | sed 's/,$//')"
+          echo "CLI_VERSION_CONTENT=$(cat src/_cli_version.py)"
+
+      - name: Verify marker file from live head
+        run: |
+          test -f LIVE_B_MARKER.txt
+          grep -q 'LIVE_B_MARKER=from-B' LIVE_B_MARKER.txt
+
+      - name: Tag write sink
+        run: |
+          TAG="livehead-release-${{ github.run_id }}"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git tag -a "$TAG" -m "livehead=$(cat LIVE_B_MARKER.txt)"
+          git push origin "$TAG"
